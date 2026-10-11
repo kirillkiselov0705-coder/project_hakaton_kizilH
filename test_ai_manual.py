@@ -7,17 +7,36 @@ async def main():
 
     ai = OllamaAssistant()
 
-    question = "Хто написав Гаррі Поттера?"
+    question = "Проаналізуйте мої витрати за цей місяць"
 
     result = await ai.is_finance_topic(question)
 
     print("Фінансова тема:", result)
 
+    
     transactions = [
-        {"description": "Продукти", "amount": 1200},
-        {"description": "Кафе", "amount": 600},
-        {"description": "Казино", "amount": 800},
+        {
+            "description": "АТБ",
+            "amount": 1200,
+            "category": "Продукти",
+        },
+        {
+            "description": "Кав'ярня",
+            "amount": 450,
+            "category": "Кафе",
+        },
+        {
+            "description": "Online Casino",
+            "amount": 800,
+            "category": "Розваги",
+        },
+        {
+            "description": "Netflix",
+            "amount": 300,
+            "category": "Підписки",
+        },
     ]
+
 
     if result:
         answer = await ai.answer(question, transactions)
