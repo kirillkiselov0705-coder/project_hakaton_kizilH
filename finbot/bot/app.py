@@ -10,6 +10,7 @@ from finbot.analysis.score import ScoreCalculator
 from finbot.analysis.waste_detector import WasteDetector
 from finbot.banking.resolver import BankingResolver
 from finbot.bot.handlers import build_router
+from finbot.llm.report_service import ReportService
 from finbot.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ COMMANDS = [
     BotCommand(command="disconnect", description="Відключити monobank"),
     BotCommand(command="statement", description="Виписка за 30 днів"),
     BotCommand(command="waste", description="Перевірка на порожні витрати"),
+    BotCommand(command="analyze", description="Аналіз витрат за допомогою ШІ"),
     BotCommand(command="cancel", description="Скасувати підключення"),
 ]
 
@@ -36,8 +38,13 @@ async def run_bot(settings: Settings) -> None:
         bot = Bot(token=settings.telegram_bot_token)
         dispatcher = Dispatcher()
         dispatcher.include_router(
-            build_router(resolver, WasteDetector(), ScoreCalculator())
+        build_router(
+            resolver,
+            WasteDetector(),
+            ScoreCalculator(),
+            ReportService(),
         )
+    )
 
         await bot.set_my_commands(COMMANDS)
 
