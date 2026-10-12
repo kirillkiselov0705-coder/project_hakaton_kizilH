@@ -1,5 +1,5 @@
 """Обробники команд Telegram-бота."""
-
+import logging
 import httpx
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
@@ -19,6 +19,9 @@ from finbot.banking.monobank import InvalidTokenError, MonobankError, RateLimitE
 from finbot.banking.resolver import BankingResolver
 from finbot.bot import messages
 from finbot.bot.formatters import format_statement, format_waste_report
+from finbot.llm.report_service import ReportService
+from finbot.llm.transaction_adapter import TransactionAdapter
+logger = logging.getLogger(__name__)
 
 CONNECT_CALLBACK = "connect"
 
@@ -43,6 +46,7 @@ def build_router(
     resolver: BankingResolver,
     detector: WasteDetector,
     calculator: ScoreCalculator,
+    report_service: ReportService,
 ) -> Router:
     router = Router()
 
@@ -122,6 +126,50 @@ def build_router(
         if is_demo:
             text = f"{messages.DEMO_NOTICE}\n\n{text}"
         await message.answer(text)
+    
+    @router.message(Command("analyze"))
+    async def handle_analyze(message: Message) -> None:
+
+        loaded = await _load(message)
+
+        if loaded is None:
+            return
+
+        transactions, is_demo = loaded
+
+        adapted = TransactionAdapter.convert(transactions)
+
+        if not adapted:
+            await message.answer(
+                "За вибраний період немає витрат для аналізу."
+            )
+            return
+
+        await message.answer(
+            "Аналізую Ваші витрати за допомогою ШІ. "
+            "Будь ласка, зачекайте."
+        )
+
+        try:
+            report = await report_service.generate(
+                "Проаналізуйте мої витрати за останні 30 днів",
+                adapted,
+            )
+
+        except Exception:
+            logger.exception("Помилка під час аналізу витрат")
+            await message.answer(
+                "Не вдалося виконати аналіз. "
+                "Перевірте, чи запущено Ollama."
+            )
+            return
+
+        if is_demo:
+            report = f"{messages.DEMO_NOTICE}\n\n{report}"
+
+        # Telegram обмежує довжину одного повідомлення.
+        for start in range(0, len(report), 3500):
+            await message.answer(report[start:start + 3500])
 
     # Має бути останнім: ловить токен, коли очікується підключення.
     @router.message(ConnectStates.waiting_token, F.text, ~F.text.startswith("/"))
